@@ -1,0 +1,14 @@
+channel_default: ""
+viewer_concurrency: 20
+user_agent_rotation: true
+
+proxy:
+  enabled: false
+  pool_file: proxies.txt
+  rotate_every: 25
+
+ai:
+  provider: openai
+  model: gpt-4o-mini
+  temperature: 0.7
+  max_chat_per_minute: 6
