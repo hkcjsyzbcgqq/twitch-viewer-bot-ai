@@ -1,0 +1,37 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+dist/
+build/
+
+# Twitch viewer bot runtime artifacts
+sessions/
+proxies.txt
+cookies/
+*.session
+*.har
+logs/
+captures/
+
+# AI model caches
+models/cache/
+*.onnx
+*.pt
+*.gguf
+
+# Env
+.env
+.env.*
+config.local.yaml
+config.local.json
+
+# OS
+.DS_Store
+Thumbs.db
