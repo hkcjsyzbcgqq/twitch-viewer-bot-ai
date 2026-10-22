@@ -1,0 +1,1 @@
+"""Adapters bridging the pool to external transports."""
