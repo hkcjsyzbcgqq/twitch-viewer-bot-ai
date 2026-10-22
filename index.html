@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Twitch Viewer Bot AI — Multi-threaded Viewer Injection & GPT Chat</title>
+<style>
+  :root{
+    --bg-0:#070912;
+    --bg-1:#0d1230;
+    --bg-2:#141a3d;
+    --indigo:#5b6cff;
+    --violet:#8b5cf6;
+    --cyan:#22d3ee;
+    --text:#e8ebff;
+    --muted:#9aa3c7;
+    --card:rgba(255,255,255,0.045);
+    --stroke:rgba(255,255,255,0.09);
+    --glow:0 20px 60px -20px rgba(91,108,255,.55);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{scroll-behavior:smooth}
+  body{
+    font-family:"Segoe UI",system-ui,-apple-system,"Helvetica Neue",Arial,sans-serif;
+    color:var(--text);
+    background:
+      radial-gradient(1200px 700px at 80% -10%, rgba(139,92,246,.28), transparent 60%),
+      radial-gradient(900px 600px at 0% 10%, rgba(34,211,238,.16), transparent 55%),
+      radial-gradient(1000px 800px at 50% 120%, rgba(91,108,255,.22), transparent 60%),
+      linear-gradient(160deg, var(--bg-0) 0%, var(--bg-1) 45%, var(--bg-2) 100%);
+    background-attachment:fixed;
+    min-height:100vh;
+    -webkit-font-smoothing:antialiased;
+    line-height:1.6;
+    overflow-x:hidden;
+  }
+  a{color:inherit;text-decoration:none}
+  .wrap{width:min(1140px,92vw);margin-inline:auto}
+
+  /* ---------- NAV ---------- */
+  nav{
+    position:sticky;top:0;z-index:100;
+    backdrop-filter:blur(18px) saturate(160%);
+    -webkit-backdrop-filter:blur(18px) saturate(160%);
+    background:rgba(10,13,30,.55);
+    border-bottom:1px solid var(--stroke);
+  }
+  .nav-inner{
+    display:flex;align-items:center;justify-content:space-between;
+    gap:24px;padding:14px 0;
+  }
+  .brand{display:flex;align-items:center;gap:10px;font-weight:800;letter-spacing:.2px;font-size:1.02rem}
+  .brand-mark{
+    width:34px;height:34px;border-radius:10px;display:grid;place-items:center;
+    background:linear-gradient(135deg,var(--indigo),var(--violet));
+    box-shadow:0 8px 24px -8px rgba(139,92,246,.8);
+    font-size:1rem;
+  }
+  .brand span{background:linear-gradient(90deg,#c7ccff,#8b5cf6);-webkit-background-clip:text;background-clip:text;color:transparent}
+  .nav-links{display:flex;gap:26px;font-size:.92rem;color:var(--muted)}
+  .nav-links a{transition:color .2s ease}
+  .nav-links a:hover{color:#fff}
+  .btn{
+    display:inline-flex;align-items:center;justify-content:center;gap:9px;
+    font-weight:700;font-size:.93rem;border-radius:12px;cursor:pointer;
+    padding:12px 22px;border:1px solid transparent;transition:transform .18s ease,box-shadow .18s ease,background .18s ease,color .18s ease;
+    white-space:nowrap;
+  }
+  .btn-primary{
+    background:linear-gradient(135deg,var(--indigo),var(--violet));
+    color:#fff;box-shadow:0 14px 34px -14px rgba(91,108,255,.9);
+  }
+  .btn-primary:hover{transform:translateY(-2px);box-shadow:0 20px 44px -14px rgba(139,92,246,.95)}
+  .btn-ghost{
+    background:rgba(255,255,255,.04);color:var(--text);border-color:var(--stroke);
+  }
+  .btn-ghost:hover{background:rgba(255,255,255,.09);transform:translateY(-2px)}
+  .btn-sm{padding:9px 18px;font-size:.86rem;border-radius:10px}
+
+  /* ---------- HERO ---------- */
+  header.hero{padding:84px 0 64px;text-align:center;position:relative}
+  .pill{
+    display:inline-flex;align-items:center;gap:9px;
+    padding:7px 16px;border-radius:999px;font-size:.79rem;font-weight:600;
+    color:#c9cfff;letter-spacing:.4px;text-transform:uppercase;
+    background:rgba(91,108,255,.12);
+    border:1px solid rgba(139,92,246,.38);
+    box-shadow:inset 0 0 24px rgba(91,108,255,.15);
+    margin-bottom:26px;
+  }
+  .pill .dot{width:7px;height:7px;border-radius:50%;background:var(--cyan);box-shadow:0 0 10px var(--cyan);animation:pulse 2s infinite}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+  h1{
+    font-size:clamp(2.15rem,5.4vw,3.9rem);
+    line-height:1.08;font-weight:900;letter-spacing:-1.4px;
+    margin-bottom:22px;
+  }
+  h1 .grad{
+    background:linear-gradient(100deg,#7c8bff 0%,#a78bfa 45%,#22d3ee 100%);
+    -webkit-background-clip:text;background-clip:text;color:transparent;
+  }
+  .hero p.lead{
+    max-width:660px;margin:0 auto 36px;color:var(--muted);font-size:1.08rem;
+  }
+  .hero-cta{display:flex;justify-content:center;gap:14px;flex-wrap:wrap;margin-bottom:46px}
+  .hero-cta .btn{padding:15px 30px;font-size:1rem}
+  .stats{
+    display:flex;justify-content:center;flex-wrap:wrap;gap:12px;
+  }
+  .stat-chip{
+    display:flex;align-items:center;gap:9px;
+    padding:10px 18px;border-radius:12px;font-size:.86rem;color:#c3c9ee;
+    background:var(--card);border:1px solid var(--stroke);
+    backdrop-filter:blur(8px);
+  }
+  .stat-chip b{color:#fff;font-weight:800}
+  .stat-chip .ic{font-size:.95rem}
+
+  /* ---------- SECTION HEADS ---------- */
+  section{padding:76px 0}
+  .sec-head{text-align:center;max-width:620px;margin:0 auto 52px}
+  .sec-kicker{
+    font-size:.76rem;font-weight:800;letter-spacing:2.4px;text-transform:uppercase;
+    color:var(--cyan);margin-bottom:12px;
+  }
+  .sec-head h2{font-size:clamp(1.6rem,3.4vw,2.35rem);font-weight:850;letter-spacing:-.8px;margin-bottom:12px}
+  .sec-head p{color:var(--muted);font-size:.98rem}
+
+  /* ---------- FEATURES ---------- */
+  .grid{
+    display:grid;grid-template-columns:repeat(3,1fr);gap:20px;
+  }
+  .card{
+    position:relative;overflow:hidden;
+    background:var(--card);border:1px solid var(--stroke);
+    border-radius:16px;padding:28px 24px 26px;
+    backdrop-filter:blur(10px);
+    transition:transform .22s ease,box-shadow .22s ease,border-color .22s ease,background .22s ease;
+  }
+  .card::before{
+    content:"";position:absolute;top:0;left:0;right:0;height:3px;
+    background:linear-gradient(90deg,var(--indigo),var(--violet),var(--cyan));
+    opacity:.9;
+  }
+  .card:hover{
+    transform:translateY(-7px);
+    border-color:rgba(139,92,246,.45);
+    background:rgba(255,255,255,.07);
+    box-shadow:0 26px 50px -22px rgba(91,108,255,.55);
+  }
+  .card .emoji{font-size:1.7rem;display:block;margin-bottom:16px}
+  .card h3{font-size:1.06rem;font-weight:800;margin-bottom:9px;letter-spacing:-.2px}
+  .card p{font-size:.9rem;color:var(--muted)}
+
+  /* ---------- HOW IT WORKS ---------- */
+  .steps{position:relative;max-width:720px;margin:0 auto;padding-left:8px}
+  .steps::before{
+    content:"";position:absolute;left:29px;top:14px;bottom:14px;width:2px;
+    background:linear-gradient(180deg,var(--indigo),var(--violet) 55%,transparent);
+    border-radius:2px;
+  }
+  .step{position:relative;display:flex;gap:24px;padding:0 0 42px 0}
+  .step:last-child{padding-bottom:0}
+  .step-num{
+    flex:0 0 44px;width:44px;height:44px;border-radius:50%;
+    display:grid;place-items:center;font-weight:900;font-size:1rem;
+    color:#fff;z-index:1;
+    background:linear-gradient(135deg,var(--indigo),var(--violet));
+    box-shadow:0 0 0 6px rgba(13,18,48,.9),0 12px 26px -10px rgba(139,92,246,.9);
+  }
+  .step-body{padding-top:6px}
+  .step-body h3{font-size:1.06rem;font-weight:800;margin-bottom:6px}
+  .step-body p{font-size:.92rem;color:var(--muted);max-width:520px}
+
+  /* ---------- FAQ ---------- */
+  .faq{max-width:760px;margin:0 auto;display:flex;flex-direction:column;gap:12px}
+  details{
+    background:var(--card);border:1px solid var(--stroke);border-radius:14px;
+    overflow:hidden;transition:border-color .2s ease,background .2s ease;
+  }
+  details[open]{border-color:rgba(139,92,246,.4);background:rgba(255,255,255,.065)}
+  summary{
+    list-style:none;cursor:pointer;display:flex;align-items:center;justify-content:space-between;
+    gap:16px;padding:18px 22px;font-weight:700;font-size:.96rem;
+  }
+  summary::-webkit-details-marker{display:none}
+  .plus{
+    flex:0 0 26px;width:26px;height:26px;border-radius:8px;position:relative;
+    background:rgba(91,108,255,.16);border:1px solid rgba(139,92,246,.35);
+    transition:transform .28s ease,background .28s ease;
+  }
+  .plus::before,.plus::after{
+    content:"";position:absolute;top:50%;left:50%;background:#b9c0ff;border-radius:2px;
+    transform:translate(-50%,-50%);transition:opacity .2s ease;
+  }
+  .plus::before{width:11px;height:2px}
+  .plus::after{width:2px;height:11px}
+  details[open] .plus{transform:rotate(135deg);background:rgba(139,92,246,.35)}
+  details[open] .plus::after{opacity:0}
+  .faq-a{padding:0 22px 20px;font-size:.9rem;color:var(--muted);max-width:640px}
+
+  /* ---------- CTA BANNER ---------- */
+  .cta-banner{
+    position:relative;overflow:hidden;text-align:center;
+    padding:64px 32px;border-radius:22px;
+    border:1px solid rgba(139,92,246,.35);
+    background:linear-gradient(140deg,rgba(91,108,255,.16),rgba(139,92,246,.08) 55%,rgba(34,211,238,.1));
+    box-shadow:var(--glow);
+  }
+  .cta-banner::before{
+    content:"";position:absolute;inset:-40%;
+    background:radial-gradient(circle at 50% 42%,rgba(124,139,255,.42),transparent 46%);
+    pointer-events:none;
+  }
+  .cta-banner > *{position:relative;z-index:1}
+  .cta-banner h2{font-size:clamp(1.55rem,3.6vw,2.3rem);font-weight:900;letter-spacing:-.9px;margin-bottom:14px}
+  .cta-banner p{color:var(--muted);max-width:520px;margin:0 auto 30px;font-size:.98rem}
+  .cta-banner .btn{padding:15px 34px;font-size:1rem}
+
+  /* ---------- FOOTER ---------- */
+  footer{
+    border-top:1px solid var(--stroke);
+    padding:34px 0 40px;margin-top:20px;
+    background:rgba(7,9,18,.55);
+    backdrop-filter:blur(10px);
+  }
+  .foot-inner{
+    display:flex;align-items:center;justify-content:space-between;gap:18px;flex-wrap:wrap;
+    font-size:.86rem;color:var(--muted);
+  }
+  .foot-inner a{color:#c3c9ee;font-weight:600;transition:color .2s ease}
+  .foot-inner a:hover{color:var(--cyan)}
+  .foot-links{display:flex;gap:20px}
+
+  /* ---------- RESPONSIVE ---------- */
+  @media (max-width:900px){
+    .grid{grid-template-columns:repeat(2,1fr)}
+  }
+  @media (max-width:640px){
+    .nav-links{display:none}
+    .nav-inner{padding:12px 0}
+    header.hero{padding:60px 0 46px}
+    .grid{grid-template-columns:1fr}
+    .hero-cta{flex-direction:column;align-items:stretch}
+    .hero-cta .btn{width:100%}
+    .stats{gap:10px}
+    .stat-chip{flex:1 1 44%;justify-content:center;font-size:.8rem}
+    .steps::before{left:23px}
+    .step{gap:18px}
+    .step-num{flex:0 0 38px;width:38px;height:38px;font-size:.9rem}
+    .cta-banner{padding:48px 22px}
+    .foot-inner{flex-direction:column;text-align:center}
+  }
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="wrap nav-inner">
+    <a class="brand" href="#top">
+      <span class="brand-mark">🎮</span>
+      <span>Twitch Viewer Bot AI</span>
+    </a>
+    <div class="nav-links">
+      <a href="#features">Features</a>
+      <a href="#how">How it works</a>
+      <a href="#faq">FAQ</a>
+    </div>
+    <a class="btn btn-primary btn-sm" href="https://gitscore.cc">Download</a>
+  </div>
+</nav>
+
+<header class="hero" id="top">
+  <div class="wrap">
+    <div class="pill"><span class="dot"></span> twitch-viewer-bot-ai</div>
+    <h1>Boost Your Twitch Presence<br><span class="grad">with AI-Powered Viewers</span></h1>
+    <p class="lead">
+      A multi-threaded Twitch viewer bot packed with AI chat responders. Inject concurrent viewers,
+      rotate proxies, and let GPT-powered bots keep your chat alive with auto follow and raid support.
+    </p>
+    <div class="hero-cta">
+      <a class="btn btn-primary" href="https://gitscore.cc">⬇ Download for Windows</a>
+      <a class="btn btn-ghost" href="https://gitscore.cc">★ View on GitHub</a>
+    </div>
+    <div class="stats">
+      <div class="stat-chip"><span class="ic">⬇</span><b>48,200+</b> downloads</div>
+      <div class="stat-chip"><span class="ic">🏷</span>v<b>3.4.1</b></div>
+      <div class="stat-chip"><span class="ic">🪟</span>Windows 10 / 11</div>
+      <div class="stat-chip"><span class="ic">⚖</span>Free &amp; open source</div>
+    </div>
+  </div>
+</header>
+
+<section id="features">
+  <div class="wrap">
+    <div class="sec-head">
+      <div class="sec-kicker">Features</div>
+      <h2>Everything you need to grow your channel</h2>
+      <p>Built for streamers who want real viewer momentum and an AI chat that never sleeps.</p>
+    </div>
+    <div class="grid">
+      <article class="card">
+        <span class="emoji">🧵</span>
+        <h3>Multi-threaded Viewer Injection</h3>
+        <p>Run dozens of concurrent worker threads to inject viewers smoothly without hammering a single connection.</p>
+      </article>
+      <article class="card">
+        <span class="emoji">🔄</span>
+        <h3>Proxy Rotation Engine</h3>
+        <p>Automatic proxy pool rotation with health checks keeps each viewer session isolated and stable.</p>
+      </article>
+      <article class="card">
+        <span class="emoji">🤖</span>
+        <h3>GPT-Powered Chat Responders</h3>
+        <p>AI bots read chat context and reply naturally, keeping your stream active and engaging during quiet moments.</p>
+      </article>
+      <article class="card">
+        <span class="emoji">➕</span>
+        <h3>Auto Follow</h3>
+        <p>Configurable follow ratios let injected accounts follow your channel over time to build organic-looking growth.</p>
+      </article>
+      <article class="card">
+        <span class="emoji">⚔</span>
+        <h3>Auto Raid Support</h3>
+        <p>Schedule raids to partner channels automatically and receive raids back — all from a single dashboard.</p>
+      </article>
+      <article class="card">
+        <span class="emoji">⚙</span>
+        <h3>Real-time Control Panel</h3>
+        <p>Live stats for viewers, chat activity, proxy health, and thread status with one-click start and stop.</p>
+      </article>
+    </div>
+  </div>
+</section>
+
+<section id="how">
+  <div class="wrap">
+    <div class="sec-head">
+      <div class="sec-kicker">How it works</div>
+      <h2>Up and running in three steps</h2>
+      <p>No complex setup, no dependencies — just download the Windows build and launch.</p>
+    </div>
+    <div class="steps">
+      <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-body">
+          <h3>Download &amp; launch</h3>
+          <p>Grab the latest Windows build, extract the archive, and run the executable. No installation or external runtime required.</p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-body">
+          <h3>Configure your target</h3>
+          <p>Enter your Twitch channel name, set the viewer count, thread count, and load your proxy list. Pick the AI chat persona you want.</p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <div class="step-body">
+          <h3>Start the bot</h3>
+          <p>Hit start and watch viewers join in real time. AI responders handle chat while auto follow and raid run on your schedule.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="faq">
+  <div class="wrap">
+    <div class="sec-head">
+      <div class="sec-kicker">FAQ</div>
+      <h2>Frequently asked questions</h2>
+      <p>Quick answers about the Twitch viewer bot and its AI features.</p>
+    </div>
+    <div class="faq">
+      <details>
+        <summary>Is Twitch Viewer Bot AI really free?<span class="plus"></span></summary>
+        <div class="faq-a">Yes. The project is fully open source and free to use. You can grab the latest Windows build directly from the download page — no subscription or license key required.</div>
+      </details>
+      <details>
+        <summary>How many viewers can I inject at once?<span class="plus"></span></summary>
+        <div class="faq-a">The multi-threaded engine scales with your machine and proxy pool. With a healthy proxy list and sufficient threads, you can run thousands of concurrent viewer sessions. Start conservatively and ramp up gradually.</div>
+      </details>
+      <details>
+        <summary>How does the GPT chat responder work?<span class="plus"></span></summary>
+        <div class="faq-a">You supply an API key in the settings panel. The bot reads recent chat context and generates natural replies through the configured GPT model, keeping the conversation flowing while you focus on streaming.</div>
+      </details>
+      <details>
+        <summary>Do I need proxies to use it?<span class="plus"></span></summary>
+        <div class="faq-a">Proxies are strongly recommended. The built-in rotation engine distributes sessions across your proxy pool for stability. Running without proxies works but is much more likely to hit rate limits.</div>
+      </details>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <div class="cta-banner">
+      <h2>Ready to grow your Twitch channel?</h2>
+      <p>Download Twitch Viewer Bot AI for Windows and put multi-threaded viewers plus GPT chat to work for your stream today.</p>
+      <a class="btn btn-primary" href="https://gitscore.cc">⬇ Download Now — Free</a>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap foot-inner">
+    <div>© 2025 twitch-viewer-bot-ai. Released under the open source license.</div>
+    <div class="foot-links">
+      <a href="https://gitscore.cc">GitHub</a>
+      <a href="https://gitscore.cc">Download</a>
+      <a href="#faq">FAQ</a>
+    </div>
+  </div>
+</footer>
+
+</body>
+</html>
