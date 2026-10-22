@@ -1,0 +1,19 @@
+[project]
+name = "twitch-viewer-bot-ai"
+version = "0.6.2"
+description = "Twitch viewer bot with AI chat functions — educational research toolkit"
+requires-python = ">=3.10"
+readme = "README.md"
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.mypy]
+python_version = "3.10"
+strict = false
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
